@@ -78,14 +78,30 @@
     if (c.indexOf('lend') >= 0 || c.indexOf('cdp') >= 0 || c.indexOf('collateral') >= 0) return 'Supply $' + capital + ' of USDC to ' + name + ' on ' + chain + ' and keep the position open.';
     if (c.indexOf('dex') >= 0 || c.indexOf('yield') >= 0 || c.indexOf('leveraged farm') >= 0) return 'Provide $' + capital + ' of liquidity to ' + name + "'s main pool on " + chain + ' and keep the position open.';
     if (c.indexOf('bridge') >= 0) return 'Bridge $' + capital + ' of USDC to ' + chain + ' through ' + name + ' and use the bridged funds in its app.';
-    if (c.indexOf('staking') >= 0 || c.indexOf('restak') >= 0) return "Stake $" + capital + " of the chain's staking asset through " + name + ' and keep the receipt.';
-    if (c.indexOf('perpetual') >= 0 || c.indexOf('derivative') >= 0) return 'Deposit $' + capital + ' of USDC as margin on ' + name + ' and open one small hedge.';
-    if (c.indexOf('prediction') >= 0) return 'Fund $' + capital + ' and place one market position on ' + name + '.';
+    if (c.indexOf('staking') >= 0 || c.indexOf('restak') >= 0) return 'Stake $' + capital + " of " + chain + "'s staking asset through " + name + ' and keep the receipt.';
+    if (c.indexOf('perpetual') >= 0 || c.indexOf('derivative') >= 0) return 'Deposit $' + capital + ' of USDC as margin on ' + name + ' on ' + chain + ' and open one small hedge.';
+    if (c.indexOf('prediction') >= 0) return 'Fund $' + capital + ' and place one market position on ' + name + ' on ' + chain + '.';
     if (c.indexOf('curator') >= 0 || c.indexOf('allocator') >= 0) return 'Deposit $' + capital + ' into a ' + name + ' vault on ' + chain + ' and keep the shares.';
     if (c.indexOf('stable') >= 0) return 'Mint or deposit $' + capital + ' of the stable asset through ' + name + ' on ' + chain + '.';
     if (c.indexOf('rwa') >= 0) return "Mint $" + capital + " of the protocol's yield asset on " + chain + ' and hold it.';
     if (c.indexOf('insurance') >= 0) return 'Buy $' + capital + ' of cover from ' + name + ' on ' + chain + ' and keep the policy.';
+    if (c.indexOf('basis') >= 0 || c.indexOf('trading') >= 0) return 'Deposit $' + capital + " of USDC into " + name + "'s basis strategy on " + chain + ' and keep the position open.';
+    if (c === 'chain') return 'Bridge $' + capital + ' of USDC onto ' + name + ' and use it in one of its apps.';
+    if (c.indexOf('payment') >= 0) return 'Send $' + capital + ' through ' + name + ' on ' + chain + ' and keep the receipt.';
+    if (c.indexOf('governance') >= 0) return 'Deposit $' + capital + ' into ' + name + ' on ' + chain + ' and vote on one proposal.';
     return 'Deposit $' + capital + ' of USDC into ' + name + ' on ' + chain + ' and keep the position open.';
+  }
+  // One protocol-specific detail for the core farm step, from its own record: its TVL size and, when
+  // reported, the direction of its seven-day TVL trend. Same derivation main.ts writes to board.json.
+  function detailFor(p) {
+    var tvlM = p.tvl_usd / 1e6;
+    var tvlText = tvlM >= 1000 ? '$' + (tvlM / 1000).toFixed(1) + 'B' : '$' + Math.round(tvlM) + 'M';
+    var trend = p.change_7d;
+    if (trend !== null && trend !== undefined && Math.abs(trend) >= 0.1) {
+      var dir = trend > 0 ? 'up' : 'down';
+      return 'It holds ' + tvlText + ' of TVL, ' + dir + ' ' + Math.abs(trend).toFixed(1) + '% over the last 7 days';
+    }
+    return 'It holds ' + tvlText + ' of TVL';
   }
   function stepText(step) {
     var s = step.text + ' Cost: ' + step.cost + '. Time: ' + step.time + '.';
@@ -99,7 +115,7 @@
     var hold = holdDaysFor(p.age_days);
     return [
       { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas for the first transaction', time: '5 minutes' },
-      { text: actionFor(p, capital, chain), cost: '$' + capital + ' of capital and about $' + (capital >= 150 ? 8 : 4) + ' of gas', time: '15 minutes to set up' },
+      { text: actionFor(p, capital, chain) + ' ' + detailFor(p) + '.', cost: '$' + capital + ' of capital and about $' + (capital >= 150 ? 8 : 4) + ' of gas', time: '15 minutes to set up' },
       { text: 'Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.', cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: 'the $' + capital + ' stays in the position', time: hold + ' days' },
       { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: 'no fee to check, and never pay to claim', time: '10 minutes' },
@@ -310,7 +326,7 @@
       el('div', { class: 'formula' },
         'implied = round( tvl_usd x ' + base + ' x (1 + clamp(change_7d, ' + m.growth_floor + ', ' + m.growth_cap + ') / 100 x ' + m.growth_weight + ') x (' + m.maturity_floor + ' + min(age_days, ' + m.maturity_days + ') / ' + m.maturity_days + ' x ' + m.maturity_range + ') )'
       ),
-      el('p', { class: 'model-note', text: "Where the base multiple comes from: it is not a fixed number. It is derived from this snapshot. Take the protocols that already have a token and sit at or above the " + floorM + " watchlist floor, and take the median of their market-cap-to-TVL ratios. The median is used instead of the mean because a few tokens are priced on something other than TVL, and they would pull the mean far from what the market typically pays. On this snapshot the median is " + base + " (shown rounded to three decimals), about eight cents of market value for each dollar of TVL. The 0.25 in the model's constants is only a fallback, used if a snapshot has no tokenized protocols at all." }),
+      el('p', { class: 'model-note', text: "Where the base multiple comes from: it is not a fixed number. It is derived from this snapshot. Take the protocols that already have a token and sit at or above the " + floorM + " watchlist floor (47 protocols), and take the median of their market-cap-to-TVL ratios. The median is used instead of the mean because a few tokens are priced on something other than TVL, and they would pull the mean far from what the market typically pays. On this snapshot the median is " + base + " (shown rounded to three decimals), about eight cents of market value for each dollar of TVL. The 0.25 in the model's constants is only a fallback, used if a snapshot has no tokenized protocols at all." }),
       el('p', { class: 'model-note', text: 'TVL and seven-day growth come from the snapshot. Age is the time since the protocol was first listed, the best record of how long it has run with no token; an unlisted age uses ' + m.unknown_age_days + ' days. The early radar is every pre-token protocol below the watchlist floor, by TVL, and the live-token protocols are set aside with their market caps shown.' }),
       el('p', { class: 'model-note', text: "Snapshot " + DATA.as_of + ", from the DefiLlama public protocol index. Implied value is a model estimate built from that snapshot's figures. It is not a price, and it is not a prediction that a token will launch." })
     );
